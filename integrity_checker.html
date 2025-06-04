@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web File Integrity Checker</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 2rem;
+            background-color: #e0f2f7; /* Light blue background */
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            padding: 2.5rem;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #0277bd; /* Darker blue for heading */
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .section {
+            background-color: #f7f9fb;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid #cce7ee;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.7rem;
+            font-weight: bold;
+            color: #01579b;
+        }
+        input[type="file"] {
+            padding: 0.8rem;
+            border: 1px solid #a7d9ed;
+            border-radius: 5px;
+            background-color: #e3f2fd;
+            cursor: pointer;
+            width: calc(100% - 1.6rem); /* Adjust width for padding */
+        }
+        input[type="text"] {
+            width: calc(100% - 20px); /* Adjust width for padding */
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #a7d9ed;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+        button {
+            background-color: #007bb5; /* Blue button */
+            color: white;
+            padding: 0.8rem 1.5rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #005f8f; /* Darker blue on hover */
+        }
+        #output {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background-color: #e8f5e9; /* Light green for output */
+            border: 1px solid #a5d6a7;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #2e7d32;
+            word-break: break-all; /* Break long hash strings */
+        }
+        .error {
+            background-color: #ffebee; /* Light red for errors */
+            border: 1px solid #ef9a9a;
+            color: #c62828;
+        }
+        .warning {
+            background-color: #fffde7; /* Light yellow for warnings */
+            border: 1px solid #ffe082;
+            color: #f9a825;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Web File Integrity Checker</h1>
+
+        <div class="section">
+            <label for="fileInput">1. Select a File:</label>
+            <input type="file" id="fileInput">
+            <button onclick="calculateAndDisplayHash()">Calculate Hash</button>
+        </div>
+
+        <div class="section">
+            <label for="currentFileHash">Calculated Hash (SHA-256):</label>
+            <input type="text" id="currentFileHash" readonly placeholder="Calculated hash will appear here...">
+        </div>
+
+        <div class="section">
+            <label for="storedHashInput">2. Enter a Stored Hash for Comparison:</label>
+            <input type="text" id="storedHashInput" placeholder="Paste a previously saved hash here...">
+            <button onclick="compareHashes()">Compare Hashes</button>
+        </div>
+
+        <div id="output" class="section">
+            Awaiting file selection or comparison...
+        </div>
+    </div>
+
+    <script>
+        // Function to calculate SHA-256 hash of a file
+        async function calculateSHA256(file) {
+            if (!file) {
+                return null;
+            }
+            const buffer = await file.arrayBuffer();
+            const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hexHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            return hexHash;
+        }
+
+        // Handles calculating and displaying the hash when the button is clicked
+        async function calculateAndDisplayHash() {
+            const fileInput = document.getElementById('fileInput');
+            const outputElement = document.getElementById('output');
+            const currentHashInput = document.getElementById('currentFileHash');
+            
+            outputElement.className = 'section'; // Reset styling
+            outputElement.textContent = 'Calculating hash...';
+
+            if (fileInput.files.length === 0) {
+                outputElement.textContent = '❌ Please select a file first.';
+                outputElement.classList.add('error');
+                currentHashInput.value = '';
+                return;
+            }
+
+            const file = fileInput.files[0];
+            try {
+                const hash = await calculateSHA256(file);
+                currentHashInput.value = hash;
+                outputElement.textContent = `✅ Hash calculated for "${file.name}": ${hash}`;
+                outputElement.classList.remove('error'); // Remove error class if successful
+                outputElement.classList.remove('warning');
+            } catch (error) {
+                console.error("Error calculating hash:", error);
+                outputElement.textContent = `❌ Error calculating hash: ${error.message}`;
+                outputElement.classList.add('error');
+                currentHashInput.value = '';
+            }
+        }
+
+        // Handles comparing the calculated hash with a manually entered stored hash
+        async function compareHashes() {
+            const fileInput = document.getElementById('fileInput');
+            const currentHashInput = document.getElementById('currentFileHash');
+            const storedHashInput = document.getElementById('storedHashInput');
+            const outputElement = document.getElementById('output');
+
+            outputElement.className = 'section'; // Reset styling
+
+            if (fileInput.files.length === 0) {
+                outputElement.textContent = '❌ Please select a file first to calculate its current hash.';
+                outputElement.classList.add('error');
+                return;
+            }
+
+            const currentHash = currentHashInput.value;
+            const storedHash = storedHashInput.value.trim();
+
+            if (!currentHash) {
+                outputElement.textContent = '❌ Please calculate the file\'s hash before comparing.';
+                outputElement.classList.add('error');
+                return;
+            }
+
+            if (!storedHash) {
+                outputElement.textContent = '⚠️ Please enter a hash to compare against.';
+                outputElement.classList.add('warning');
+                return;
+            }
+
+            if (currentHash === storedHash) {
+                outputElement.textContent = '✅ File is intact. No changes detected!';
+                outputElement.classList.remove('error', 'warning');
+            } else {
+                outputElement.textContent = '⚠️ File has been modified or corrupted!';
+                outputElement.classList.add('warning');
+            }
+        }
+    </script>
+</body>
+</html>
